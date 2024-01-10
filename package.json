@@ -1,0 +1,21 @@
+{
+  "name": "@giesf/sprit",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "build": "bun build src/index.ts --outdir=dist"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "html-template-tag": "^4.0.1",
+    "pino": "^8.17.2",
+    "valibot": "^0.25.0"
+  }
+}
