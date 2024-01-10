@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "html-template-tag": "^4.0.1",
-    "pino": "^8.17.2",
     "valibot": "^0.25.0"
   }
 }

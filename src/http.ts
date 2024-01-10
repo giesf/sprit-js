@@ -1,6 +1,5 @@
 import type { MatchedRoute } from "bun";
 import { parse, safeParse } from 'valibot'
-import './logging'
 import { HTTPError } from "./res/HTTPError";
 import { FancyErrorResponse } from "./res/ErrorResponse";
 import { JSONResponse } from "./res/JSONResponse";

@@ -1,7 +1,6 @@
 
 export * from './html'
 export * from './http'
-export * from './logging'
 export * from './services'
 
 export * from './res/ErrorResponse'
