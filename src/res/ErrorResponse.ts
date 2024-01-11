@@ -1,3 +1,4 @@
+import { JSONResponse } from "..";
 import { html } from "../html";
 import { HTMLResponse } from "./HTMLResponse";
 import { HTTPError } from "./HTTPError";
@@ -22,6 +23,12 @@ export class FancyErrorResponse extends HTMLResponse {
         <div class="tape"></div>
 
         `
-        super(body)
+        super(body, { status: err.statusCode })
+    }
+}
+
+export class JSONErrorResponse extends JSONResponse {
+    constructor(err: HTTPError) {
+        super(err, { status: err.statusCode })
     }
 }
