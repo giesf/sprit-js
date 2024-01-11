@@ -1,4 +1,4 @@
-import { JSONResponse } from "..";
+import { JSONResponse } from "./JSONResponse";
 import { html } from "../html";
 import { HTMLResponse } from "./HTMLResponse";
 import { HTTPError } from "./HTTPError";
