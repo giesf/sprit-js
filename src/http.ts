@@ -12,6 +12,7 @@ export type HTTPServerStartOptions = {
     staticDir?: string,
     staticRoutePrefix?: string,
     port?: number,
+    optionsRequestHandler?: (req: Request, match: MatchedRoute | null) => Response,
     errorResponseFactory?: (err: HTTPError) => Response,
     inspectOrModifyIncomingRequest?: (req: Request) => Request,
     inspectOrModifyOutgoingResponse?: (res: Response) => Response
@@ -37,6 +38,72 @@ export const startHTTPServer = (options?: HTTPServerStartOptions) => {
         if (options?.inspectOrModifyOutgoingResponse) return options.inspectOrModifyOutgoingResponse(res);
         return res;
     }
+    const optionsRequestHandler = (req: Request, match: MatchedRoute | null) => {
+        if (options?.optionsRequestHandler) {
+            return options.optionsRequestHandler(req, match)
+        }
+        const res = new Response("")
+
+        res.headers.set("Allow", "OPTIONS, GET, POST")
+
+        return res;
+    }
+
+    const requestHandler = async (incomingRequest: Request) => {
+        const req = modifyRequest(incomingRequest) as SimpleGetRequest;
+
+        const url = new URL(req.url);
+
+        if (url.pathname.startsWith(staticRoutePrefix)) {
+            const path = staticDir + url.pathname.slice(staticRoutePrefix.length);
+            const file = Bun.file(path)
+
+            const isFileExistent = await file.exists()
+            if (!isFileExistent) throw new HTTPError(404, "File not Found")
+
+
+            return new Response(file);
+        }
+
+
+        const match = router.match(url.pathname + url.search)
+
+        if (req.method == "OPTIONS") {
+            return optionsRequestHandler(req, match)
+        }
+
+        if (!match) {
+            throw new HTTPError(404, "Route not Found")
+        }
+
+        const o = await import(match.filePath)
+
+        const { params, query } = match
+
+        req.params = params;
+        req.query = query;
+
+        if (req.method == "GET" && typeof o.get == "function") {
+            const res = await o.get(req);
+            return modifyResponse(res)
+        }
+
+        if (req.method == "POST" && typeof o.post == "function") {
+            const jsonBody = req.headers.get('Content-Type') == 'application/json' ? await req.json() : {}
+            const postReq = req as SimplePostRequest;
+            postReq.jsonBody = jsonBody;
+            const res = await o.post(req)
+            return modifyResponse(res)
+        }
+        if (req.method == "POST" && typeof o.rpc == "function" && typeof o.params == "object") {
+            const jsonBody = req.headers.get('Content-Type') == 'application/json' ? await req.json() : {}
+            const rpcParams = parse(o.params, jsonBody)
+            const res = new JSONResponse(await o.rpc(rpcParams))
+            return modifyResponse(res)
+        }
+
+        throw new HTTPError(405, "Method Not Allowed")
+    }
 
 
     const server = Bun.serve({
@@ -54,56 +121,9 @@ export const startHTTPServer = (options?: HTTPServerStartOptions) => {
             return new FancyErrorResponse(internalError)
         },
         async fetch(incomingRequest: Request) {
-            const req = modifyRequest(incomingRequest) as SimpleGetRequest;
-
-            const url = new URL(req.url);
-
-            if (url.pathname.startsWith(staticRoutePrefix)) {
-                const path = staticDir + url.pathname.slice(staticRoutePrefix.length);
-                const file = Bun.file(path)
-
-                const isFileExistent = await file.exists()
-                if (!isFileExistent) throw new HTTPError(404, "File not Found")
-
-
-                return new Response(file);
-            }
-
-
-            const match = router.match(url.pathname + url.search)
-            console.debug("Route Requested", { match, pathname: url.pathname })
-
-            if (!match) {
-                throw new HTTPError(404, "Route not Found")
-            }
-
-            const o = await import(match.filePath)
-
-            const { params, query } = match
-            console.debug("Query Exctracted", { query })
-
-            req.params = params;
-            req.query = query;
-            if (req.method == "GET" && typeof o.get == "function") {
-                const res = await o.get(req);
-                return modifyResponse(res)
-            }
-
-            if (req.method == "POST" && typeof o.post == "function") {
-                const jsonBody = req.headers.get('Content-Type') == 'application/json' ? await req.json() : {}
-                const postReq = req as SimplePostRequest;
-                postReq.jsonBody = jsonBody;
-                const res = await o.post(req)
-                return modifyResponse(res)
-            }
-            if (req.method == "POST" && typeof o.rpc == "function" && typeof o.params == "object") {
-                const jsonBody = req.headers.get('Content-Type') == 'application/json' ? await req.json() : {}
-                const rpcParams = parse(o.params, jsonBody)
-                const res = new JSONResponse(await o.rpc(rpcParams))
-                return modifyResponse(res)
-            }
-
-            throw new HTTPError(405, "Method Not Allowed")
+            const outgoingResponse = await requestHandler(incomingRequest);
+            console.log("[REQ]", new Date(), new URL(incomingRequest.url).pathname, outgoingResponse.status)
+            return outgoingResponse;
         },
     });
 
